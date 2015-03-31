@@ -5,11 +5,5 @@ Pebble.addEventListener('showConfiguration', function(e) {
 
 Pebble.addEventListener('webviewclosed', function(e) {
     var configuration = JSON.parse(decodeURIComponent(e.response));
-	
-    var language = encodeURIComponent(configuration.language);
-	if (!language) {
-		language = 'auto';
-	}
-	window.localStorage.setItem('language', language);
-  }
-);
+	Pebble.sendAppMessage('configuration', configuration);
+});

@@ -1,5 +1,6 @@
 {
     "appKeys": {
+        "bluetooth": 1,
         "language": 0
     },
     "capabilities": [
@@ -11,25 +12,8 @@
     "resources": {
         "media": [
             {
-                "file": "images/bluetooth_icon_14.png",
-                "name": "BLUETOOTH",
-                "type": "png"
-            },
-            {
-                "file": "images/watchface_logo.png",
-                "menuIcon": true,
-                "name": "LOGO",
-                "type": "png"
-            },
-            {
-                "characterRegex": "[0-9]",
                 "file": "fonts/Roboto-Light.ttf",
-                "name": "FONT_ROBOTO_LIGHT_12",
-                "type": "font"
-            },
-            {
-                "file": "fonts/Roboto-Light.ttf",
-                "name": "FONT_ROBOTO_LIGHT_18",
+                "name": "FONT_ROBOTO_LIGHT_52",
                 "type": "font"
             },
             {
@@ -39,8 +23,25 @@
             },
             {
                 "file": "fonts/Roboto-Light.ttf",
-                "name": "FONT_ROBOTO_LIGHT_52",
+                "name": "FONT_ROBOTO_LIGHT_18",
                 "type": "font"
+            },
+            {
+                "characterRegex": "[0-9]",
+                "file": "fonts/Roboto-Light.ttf",
+                "name": "FONT_ROBOTO_LIGHT_12",
+                "type": "font"
+            },
+            {
+                "file": "images/watchface_logo.png",
+                "menuIcon": true,
+                "name": "LOGO",
+                "type": "png"
+            },
+            {
+                "file": "images/bluetooth_icon_14.png",
+                "name": "BLUETOOTH",
+                "type": "png"
             }
         ]
     },

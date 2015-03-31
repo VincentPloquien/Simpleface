@@ -14,6 +14,28 @@ static GFont s_time_small_font;;
 static GFont s_time_tiny_font;
 static GBitmap *s_bluetooth_bitmap;
 
+enum {
+	LANGUAGE = 0x0,
+	BLUETOOTH = 0x1,
+};
+
+/******************************
+ AppMessage handler
+******************************/
+static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
+	APP_LOG(APP_LOG_LEVEL_INFO, "Message received!");
+	
+	Tuple *language_tuple = dict_find(iterator, LANGUAGE);
+	
+	if (language_tuple) {
+		persist_write_string(LANGUAGE, language_tuple->value->cstring);
+	}
+}
+
+static void inbox_dropped_callback(AppMessageResult reason, void *context) {
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped!");
+}
+
 /******************************
  Events handler
 ******************************/
@@ -83,6 +105,30 @@ static void bluetooth_handler(bool connected) {
 /******************************
  Main functions
 ******************************/
+
+static void setLocale() {
+	if (!persist_exists(LANGUAGE)) {
+		persist_write_string(LANGUAGE, "auto");
+		setlocale(LC_ALL, i18n_get_system_locale());		
+	} else {
+		char locale[4] = "auto";
+		persist_read_string(LANGUAGE, locale, sizeof(locale));
+		
+		if (strcmp(locale, 'en') == 0) {
+			setlocale(LC_ALL, 'en_US');
+		} else if (strcmp(locale, 'fr') == 0) {
+			setlocale(LC_ALL, 'fr_FR');
+		} else if (strcmp(locale, 'de') == 0) {
+			setlocale(LC_ALL, 'de_DE');
+		} else if (strcmp(locale, 'es') == 0) {
+			setlocale(LC_ALL, 'es_ES');
+		} else if (strcmp(locale, 'ch') == 0) {
+			setlocale(LC_ALL, 'zh_CN');
+		} else {
+			setlocale(LC_ALL, i18n_get_system_locale());
+		}
+	}
+}
 
 static void setup_ui(Window *window) {
 	// Background Line Layer
@@ -171,7 +217,7 @@ static void main_window_unload(Window *window) {
 
 static void init() {
 	// Setup the locale
-	setlocale(LC_ALL, i18n_get_system_locale());
+	setLocale();
 	
 	// Create main window
 	s_main_window = window_create();
@@ -182,6 +228,10 @@ static void init() {
 		.load = main_window_load,
 		.unload = main_window_unload,
 	});
+	
+	// Register inbox callbacks
+	app_message_register_inbox_received(inbox_received_callback);
+	app_message_register_inbox_dropped(inbox_dropped_callback);
 	
 	// Push (display) the window with animated=true
 	window_stack_push(s_main_window, true);
