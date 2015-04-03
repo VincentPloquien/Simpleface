@@ -14,26 +14,43 @@ static GFont s_time_small_font;;
 static GFont s_time_tiny_font;
 static GBitmap *s_bluetooth_bitmap;
 
-enum {
-	LANGUAGE = 0x0,
-	BLUETOOTH = 0x1,
-};
+#define LANGUAGE 0
+#define BLUETOOTH 1
 
 /******************************
- AppMessage handler
+ Misc functions
 ******************************/
-static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
-	APP_LOG(APP_LOG_LEVEL_INFO, "Message received!");
-	
-	Tuple *language_tuple = dict_find(iterator, LANGUAGE);
-	
-	if (language_tuple) {
-		persist_write_string(LANGUAGE, language_tuple->value->cstring);
+
+static void updateLocale() {
+	if (!persist_exists(LANGUAGE)) {
+		persist_write_string(LANGUAGE, "auto");
+		setlocale(LC_ALL, i18n_get_system_locale());		
+	} else {
+		char locale[5] = "auto";
+		persist_read_string(LANGUAGE, locale, sizeof(locale));
+		
+		if (strcmp(locale, "en") == 0) {
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set locale to: en_US");
+			setlocale(LC_ALL, "en_US");
+		} else if (strcmp(locale, "fr") == 0) {
+			setlocale(LC_ALL, "fr_FR");
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set locale to: fr_FR");
+		} else if (strcmp(locale, "de") == 0) {
+			setlocale(LC_ALL, "de_DE");
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set locale to: de_DE");
+		} else if (strcmp(locale, "es") == 0) {
+			setlocale(LC_ALL, "es_ES");
+			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set locale to: es_ES");
+		} else {
+			setlocale(LC_ALL, "");
+		}
 	}
 }
 
-static void inbox_dropped_callback(AppMessageResult reason, void *context) {
-  APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped!");
+static void updateBluetooth() {
+		char locale[5] = "auto";
+		persist_read_string(LANGUAGE, locale, sizeof(locale));
+	
 }
 
 /******************************
@@ -65,7 +82,7 @@ static void update_time() {
 	text_layer_set_text(s_time_layer, buffer_time);
 }
 
-static void update_day() {
+static void update_date() {
 	time_t temp = time(NULL);
 	struct tm *tick_time_day = localtime(&temp);
 	
@@ -84,7 +101,7 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 	update_time();
 	
 	if (units_changed == DAY_UNIT) {
-		update_day();
+		update_date();
 	}
 }
 
@@ -95,7 +112,11 @@ static void battery_handler(BatteryChargeState new_state) {
 }
 
 static void bluetooth_handler(bool connected) {
-	if (connected) {
+	if (!persist_exists(BLUETOOTH)) {
+		persist_write_string(BLUETOOTH, "on");
+	}
+		
+	if (connected && !persist_read_bool(BLUETOOTH)) {
 		layer_set_hidden((Layer *)s_bluetooth_layer, false);
 	} else {
 		layer_set_hidden((Layer *)s_bluetooth_layer, true);
@@ -103,32 +124,44 @@ static void bluetooth_handler(bool connected) {
 }
 
 /******************************
- Main functions
+ AppMessage handler
 ******************************/
-
-static void setLocale() {
-	if (!persist_exists(LANGUAGE)) {
-		persist_write_string(LANGUAGE, "auto");
-		setlocale(LC_ALL, i18n_get_system_locale());		
-	} else {
-		char locale[4] = "auto";
-		persist_read_string(LANGUAGE, locale, sizeof(locale));
-		
-		if (strcmp(locale, 'en') == 0) {
-			setlocale(LC_ALL, 'en_US');
-		} else if (strcmp(locale, 'fr') == 0) {
-			setlocale(LC_ALL, 'fr_FR');
-		} else if (strcmp(locale, 'de') == 0) {
-			setlocale(LC_ALL, 'de_DE');
-		} else if (strcmp(locale, 'es') == 0) {
-			setlocale(LC_ALL, 'es_ES');
-		} else if (strcmp(locale, 'ch') == 0) {
-			setlocale(LC_ALL, 'zh_CN');
+static void in_received_callback(DictionaryIterator *iterator, void *context) {
+	// Get the LANGUAGE tuple from the message
+	Tuple *language_tuple = dict_find(iterator, LANGUAGE);
+	if (language_tuple) {
+		// Write new language to persistant storage
+		persist_write_string(LANGUAGE, language_tuple->value->cstring);
+		// Update the locale
+		updateLocale();
+		update_time();
+		update_date();
+	}
+	
+	// Get the BLUETOOTH tuple from the message
+	Tuple *bluetooth_tuple = dict_find(iterator, BLUETOOTH);
+	if (bluetooth_tuple) {
+		// Write new setting to persistant storage
+		if (strcmp(bluetooth_tuple->value->cstring, "on") == 0) {
+			// on = don't hide
+			persist_write_bool(BLUETOOTH, false);
 		} else {
-			setlocale(LC_ALL, i18n_get_system_locale());
+			// off = hide
+			persist_write_int(BLUETOOTH, true);
 		}
+		
+		// Update bluetooth icon display
+		bluetooth_handler(bluetooth_connection_service_peek());
 	}
 }
+
+static void in_dropped_callback(AppMessageResult reason, void *context) {
+	APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped!");
+}
+
+/******************************
+ Main functions
+******************************/
 
 static void setup_ui(Window *window) {
 	// Background Line Layer
@@ -137,21 +170,21 @@ static void setup_ui(Window *window) {
 	layer_set_update_proc(s_line_layer, line_layer_update_callback);
 	
 	// Time TextLayer
-	s_time_layer = text_layer_create(GRect(0, 38, 144, 52));
+	s_time_layer = text_layer_create(GRect(0, 38, 144, 60));
 	text_layer_set_background_color(s_time_layer, GColorClear);
 	text_layer_set_text_color(s_time_layer, GColorWhite);
 	text_layer_set_font(s_time_layer, s_time_big_font);
 	text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
 	
 	// Date TextLayer
-	s_day_layer = text_layer_create(GRect(0, 116, 144, 18));
+	s_day_layer = text_layer_create(GRect(0, 116, 144, 26));
 	text_layer_set_background_color(s_day_layer, GColorClear);
 	text_layer_set_text_color(s_day_layer, GColorWhite);
 	text_layer_set_font(s_day_layer, s_time_small_font);
 	text_layer_set_text_alignment(s_day_layer, GTextAlignmentCenter);
 	
 	// Month TextLayer
-	s_month_layer = text_layer_create(GRect(0, 142, 144, 18));
+	s_month_layer = text_layer_create(GRect(0, 142, 144, 26));
 	text_layer_set_background_color(s_month_layer, GColorClear);
 	text_layer_set_text_color(s_month_layer, GColorWhite);
 	text_layer_set_font(s_month_layer, s_time_small_font);
@@ -185,12 +218,15 @@ static void main_window_load(Window *window) {
 	s_time_small_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_LIGHT_18));
 	s_time_tiny_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_LIGHT_12));
 	
+	// Setup the locale
+	updateLocale();
+	
 	// Create andwindow
 	setup_ui(window);
 	
 	// Update the time at launch
 	update_time();
-	update_day();
+	update_date();
 	
 	// Update the battery at launch
 	battery_handler(battery_state_service_peek());
@@ -215,10 +251,7 @@ static void main_window_unload(Window *window) {
 	fonts_unload_custom_font(s_time_tiny_font);
 }
 
-static void init() {
-	// Setup the locale
-	setLocale();
-	
+static void init() {	
 	// Create main window
 	s_main_window = window_create();
 	window_set_background_color(s_main_window, GColorBlack);
@@ -229,9 +262,10 @@ static void init() {
 		.unload = main_window_unload,
 	});
 	
-	// Register inbox callbacks
-	app_message_register_inbox_received(inbox_received_callback);
-	app_message_register_inbox_dropped(inbox_dropped_callback);
+	// Setup AppMessage communication
+	app_message_register_inbox_received(in_received_callback);
+	app_message_register_inbox_dropped(in_dropped_callback);
+	app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
 	
 	// Push (display) the window with animated=true
 	window_stack_push(s_main_window, true);
