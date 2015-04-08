@@ -14,44 +14,8 @@ static GFont s_time_small_font;;
 static GFont s_time_tiny_font;
 static GBitmap *s_bluetooth_bitmap;
 
-#define LANGUAGE 0
+#define BATTERY 0
 #define BLUETOOTH 1
-
-/******************************
- Misc functions
-******************************/
-
-static void updateLocale() {
-	if (!persist_exists(LANGUAGE)) {
-		persist_write_string(LANGUAGE, "auto");
-		setlocale(LC_ALL, i18n_get_system_locale());		
-	} else {
-		char locale[5] = "auto";
-		persist_read_string(LANGUAGE, locale, sizeof(locale));
-		
-		if (strcmp(locale, "en") == 0) {
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set locale to: en_US");
-			setlocale(LC_ALL, "en_US");
-		} else if (strcmp(locale, "fr") == 0) {
-			setlocale(LC_ALL, "fr_FR");
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set locale to: fr_FR");
-		} else if (strcmp(locale, "de") == 0) {
-			setlocale(LC_ALL, "de_DE");
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set locale to: de_DE");
-		} else if (strcmp(locale, "es") == 0) {
-			setlocale(LC_ALL, "es_ES");
-			APP_LOG(APP_LOG_LEVEL_DEBUG, "Set locale to: es_ES");
-		} else {
-			setlocale(LC_ALL, "");
-		}
-	}
-}
-
-static void updateBluetooth() {
-		char locale[5] = "auto";
-		persist_read_string(LANGUAGE, locale, sizeof(locale));
-	
-}
 
 /******************************
  Events handler
@@ -99,16 +63,23 @@ static void update_date() {
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 	update_time();
-	
-	if (units_changed == DAY_UNIT) {
-		update_date();
-	}
+	update_date();
 }
 
 static void battery_handler(BatteryChargeState new_state) {
 	static char buffer_battery[12] = "00";
 	snprintf(buffer_battery, sizeof(buffer_battery), "%d", new_state.charge_percent);
 	text_layer_set_text(s_battery_layer, buffer_battery);
+	
+	if (!persist_exists(BATTERY)) {
+		persist_write_string(BATTERY, "on");
+	}
+		
+	if (!persist_read_bool(BATTERY)) {
+		layer_set_hidden((Layer *)s_battery_layer, false);
+	} else {
+		layer_set_hidden((Layer *)s_battery_layer, true);
+	}
 }
 
 static void bluetooth_handler(bool connected) {
@@ -128,14 +99,19 @@ static void bluetooth_handler(bool connected) {
 ******************************/
 static void in_received_callback(DictionaryIterator *iterator, void *context) {
 	// Get the LANGUAGE tuple from the message
-	Tuple *language_tuple = dict_find(iterator, LANGUAGE);
-	if (language_tuple) {
-		// Write new language to persistant storage
-		persist_write_string(LANGUAGE, language_tuple->value->cstring);
-		// Update the locale
-		updateLocale();
-		update_time();
-		update_date();
+	Tuple *battery_tuple = dict_find(iterator, BATTERY);
+	if (battery_tuple) {
+		// Write new setting to persistant storage
+		if (strcmp(battery_tuple->value->cstring, "on") == 0) {
+			// on = don't hide
+			persist_write_bool(BATTERY, false);
+		} else {
+			// off = hide
+			persist_write_int(BATTERY, true);
+		}
+		
+		// Update battery icon display
+		battery_handler(battery_state_service_peek());
 	}
 	
 	// Get the BLUETOOTH tuple from the message
@@ -218,8 +194,8 @@ static void main_window_load(Window *window) {
 	s_time_small_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_LIGHT_18));
 	s_time_tiny_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_ROBOTO_LIGHT_12));
 	
-	// Setup the locale
-	updateLocale();
+	// Setup locale
+	setlocale(LC_ALL, i18n_get_system_locale());
 	
 	// Create andwindow
 	setup_ui(window);

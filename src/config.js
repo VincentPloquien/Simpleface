@@ -1,8 +1,8 @@
 Pebble.addEventListener('showConfiguration', function(e) {
   // Show config page
-	var language = localStorage.getItem('language');
-	if (language === null || language === "") {
-		language = "auto";
+	var battery = localStorage.getItem('battery');
+	if (battery === null || battery === "") {
+		battery = "off";
 	}
 	
 	var bluetooth = localStorage.getItem('bluetooth');
@@ -10,21 +10,31 @@ Pebble.addEventListener('showConfiguration', function(e) {
 		bluetooth = "off";
 	}
 	
-	var url = encodeURI('http://pebble.akwaryoum.fr/simpleface/index.html?language=' + language + '&bluetooth=' + bluetooth);
-	Pebble.openURL(url);
+	var isPebbleClassic = false;
+	
+	var url = "http://pebble.akwaryoum.fr/simpleface/";	
+
+	if (isPebbleClassic) {
+		url += "http://pebble.akwaryoum.fr/simpleface/pebble-classic.html?";
+	} else {
+		url += "http://pebble.akwaryoum.fr/simpleface/pebble-time.html?";
+	}
+	
+	url += 'battery=' + battery + '&bluetooth=' + bluetooth;
+	Pebble.openURL(encodeURI(url));
 });
 
 Pebble.addEventListener('webviewclosed', function(e) {
     var response = JSON.parse(decodeURIComponent(e.response));
 	
-	localStorage.setItem('language', response.language);
+	localStorage.setItem('battery', response.battery);
 	localStorage.setItem('bluetooth', response.bluetooth);
 	
-	if (!response.language || !response.bluetooth) {
+	if (!response.battery || !response.bluetooth) {
 		return;
 	}
 	
-	Pebble.sendAppMessage( { 'language': response.language, 'bluetooth': response.bluetooth	},
+	Pebble.sendAppMessage( { 'battery': response.battery, 'bluetooth': response.bluetooth	},
 		function(e) {
 			console.log('Send successful.');
 		},
